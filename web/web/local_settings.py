@@ -21,7 +21,7 @@ MAX_UPLOAD_SIZE = 26214400
 LANGUAGE_CODE = "en-us"
 
 ADMINS = (
-    # ("Your Name", "your_email@example.com"),
+    ("admin", "admin@admin.com"),
 )
 
 MANAGERS = ADMINS
