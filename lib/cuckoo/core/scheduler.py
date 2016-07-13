@@ -193,6 +193,7 @@ class AnalysisManager(threading.Thread):
         options["port"] = self.machine.resultserver_port
         options["category"] = self.task.category
         options["target"] = self.task.target
+        options["analysis"] = self.task.analysis
         options["package"] = self.task.package
         options["options"] = emit_options(self.task.options)
         options["enforce_timeout"] = self.task.enforce_timeout

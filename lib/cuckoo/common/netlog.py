@@ -32,6 +32,13 @@ log = logging.getLogger(__name__)
 # 20 Mb max message length.
 MAX_MESSAGE_LENGTH = 20 * 1024 * 1024
 
+def is_hex(s):
+    try:
+        int(s,16)
+        return True
+    except ValueError:
+        return False
+
 def pointer_converter_32bit(v):
     return "0x%08x" % (v % 2**32)
 
@@ -124,7 +131,16 @@ class BsonParser(ProtocolHandler):
                 # TODO Have the monitor provide actual bitmasks as well.
                 if (value & key) == key:
                     flags[argument].append(flag)
-
+                if isinstance(value, str):
+                    if is_hex(value):
+                        if (int(value,16) & key) == key:
+                            flags[argument].append(flag)
+                    else:
+                        if (int(value) & key) == key:
+                            flags[argument].append(flag)
+                else:
+                    if (value & key) == key:
+                        flags[argument].append(flag)
             flags[argument] = "|".join(flags[argument])
 
     def determine_unserializers(self, arginfo):
