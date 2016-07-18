@@ -64,12 +64,15 @@ class PipeForwarder(threading.Thread):
         sock = self.sockets[pid.value]
         self.active[pid.value] = True
 
+        log.info("[DEBUG] Socket: %s, Destination: %s", str(sock), self.destination)
+        bson_fd = open("c:\\bson_raw.bin", "wb")
         while True:
             success = KERNEL32.ReadFile(self.pipe_handle,
                                         byref(buf), sizeof(buf),
                                         byref(bytes_read), None)
 
             if success or KERNEL32.GetLastError() == ERROR_MORE_DATA:
+                bson_fd.write(buf.raw[:bytes_read.value])
                 sock.sendall(buf.raw[:bytes_read.value])
             # If we get the broken pipe error then this pipe connection has
             # been terminated for one reason or another. So break from the
@@ -82,7 +85,7 @@ class PipeForwarder(threading.Thread):
                 log.warning("The log pipe handler has failed, last error %d.",
                             KERNEL32.GetLastError())
                 break
-
+        bson_fd.close()
         self.active[pid.value] = False
 
 class PipeDispatcher(threading.Thread):

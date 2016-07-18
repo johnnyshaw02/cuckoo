@@ -280,14 +280,42 @@ class Process(object):
         if args:
             argv += ["--args", self._encode_args(args)]
 
-        '''
+        if curdir:
+            argv += ["--curdir", self.shortpath(curdir)]
+
+        if source:
+            if isinstance(source, (int, long)) or source.isdigit():
+                argv += ["--from", "%s" % source]
+            else:
+                argv += ["--from-process", source]
+
+        if maximize:
+            argv += ["--maximize"]
+
+        try:
+            log.info("[DEBUG] HERE: %r", argv)
+            output = subprocess_checkoutput(argv, env)
+            self.pid, self.tid = map(int, output.split())
+        except Exception:
+            log.error("Failed to execute process from path %r with "
+                      "arguments %r (Error: %s)", path, argv,
+                      get_error_string(KERNEL32.GetLastError()))
+            return False
+
+        argv = [
+            inject_exe,
+            "--resume-thread",
+            "--pid", "%s" % self.pid,
+            "--tid", "%s" % self.tid,
+        ]
+
         if free or kernel_analysis:
-            argv.append("--free")
+            argv += ["--free"]
         else:
             argv += ["--apc", "--dll", dllpath]
 
         argv += ["--config", self.drop_config(mode=mode)]
-        '''
+
         if kernel_analysis:
             argv += ["--kernel_analysis"]
             log.warning("kernel analysis !")
@@ -301,6 +329,9 @@ class Process(object):
                 log.warning("No valid zer0m0n files to be used, analysis aborted")
                 return False
 
+            # We will install the KM analysis driver manually and
+            # start logs_dispatcher.exe manually
+            '''
             exe_name = random_string(6)
             service_name = random_string(6)
             driver_name = random_string(6)
@@ -334,6 +365,7 @@ class Process(object):
             startup_info._cb = sizeof(startup_info)
             process_info = PROCESS_INFORMATION()
             creation_flags = CREATE_NEW_CONSOLE
+            # Start log_dispatcher.exe
             ldp = KERNEL32.CreateProcessA(new_exe,
                                           None,
                                           None,
@@ -348,43 +380,10 @@ class Process(object):
             if not ldp:
                 log.error("Failed starting " + exe_name + ".exe.")
                 return False
-
-        if curdir:
-            argv += ["--curdir", self.shortpath(curdir)]
-
-        if source:
-            if isinstance(source, (int, long)) or source.isdigit():
-                argv += ["--from", "%s" % source]
-            else:
-                argv += ["--from-process", source]
-
-        if maximize:
-            argv += ["--maximize"]
+            '''
 
         try:
-            output = subprocess_checkoutput(argv, env)
-            self.pid, self.tid = map(int, output.split())
-        except Exception:
-            log.error("Failed to execute process from path %r with "
-                      "arguments %r (Error: %s)", path, argv,
-                      get_error_string(KERNEL32.GetLastError()))
-            return False
-
-        argv = [
-            inject_exe,
-            "--resume-thread",
-            "--pid", "%s" % self.pid,
-            "--tid", "%s" % self.tid,
-        ]
-
-        if free or kernel_analysis:
-            argv += ["--free"]
-        else:
-            argv += ["--apc", "--dll", dllpath]
-
-        argv += ["--config", self.drop_config(mode=mode)]
-
-        try:
+            log.info("[DEBUG] THERE: %r", argv)
             subprocess_checkoutput(argv, env)
         except Exception:
             log.error("Failed to execute process from path %r with "

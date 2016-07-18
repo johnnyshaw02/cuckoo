@@ -105,9 +105,10 @@ class BsonParser(ProtocolHandler):
             )
 
     def resolve_flags(self, apiname, argdict, flags):
+        log.info('[DEBUG] API name: %s', apiname)
         # Resolve 1:1 values.
         for argument, values in self.flags_value[apiname].items():
-            if isinstance(argdict[argument], str):
+            if isinstance(argdict[argument], (str, unicode)):
                 value = int(argdict[argument], 16)
             else:
                 value = argdict[argument]
@@ -122,24 +123,24 @@ class BsonParser(ProtocolHandler):
 
             flags[argument] = []
 
-            if isinstance(argdict[argument], str):
+            if isinstance(argdict[argument], (str, unicode)):
                 value = int(argdict[argument], 16)
             else:
                 value = argdict[argument]
 
             for key, flag in values:
                 # TODO Have the monitor provide actual bitmasks as well.
-                if (value & key) == key:
+                if (value & key) == value:
                     flags[argument].append(flag)
-                if isinstance(value, str):
+                if isinstance(value, (str, unicode)):
                     if is_hex(value):
-                        if (int(value,16) & key) == key:
+                        if (int(value,16) & key) == value:
                             flags[argument].append(flag)
                     else:
-                        if (int(value) & key) == key:
+                        if (int(value) & key) == value:
                             flags[argument].append(flag)
                 else:
-                    if (value & key) == key:
+                    if (value & key) == value:
                         flags[argument].append(flag)
             flags[argument] = "|".join(flags[argument])
 
@@ -277,6 +278,7 @@ class BsonParser(ProtocolHandler):
 
                 argdict = {}
                 for idx, value in enumerate(args):
+                    log.info("[DEBUG] Index: %s, value: %s", idx, value)
                     argdict[argnames[idx]] = converters[idx](value)
 
                 # Special new process message from the monitor.
