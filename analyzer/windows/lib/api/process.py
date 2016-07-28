@@ -8,6 +8,7 @@ import logging
 import random
 import subprocess
 import tempfile
+import _winreg
 import traceback
 
 from ctypes import byref, c_ulong, create_string_buffer, c_int, sizeof
@@ -220,6 +221,15 @@ class Process(object):
 
         return bitsize == 32
 
+    def is64bit(self):
+        aReg = _winreg.ConnectRegistry(None, _winreg.HKEY_LOCAL_MACHINE)
+        try:
+            hKey = _winreg.OpenKey(aReg, r'SOFTWARE\Wow6432Node')
+            hKey.Close()
+            return True
+        except:
+            return False
+
     def execute(self, path, args=None, dll=None, free=False, kernel_analysis=False, curdir=None,
                 source=None, mode=None, maximize=False, env=None):
         """Execute sample process.
@@ -242,6 +252,7 @@ class Process(object):
             return False
         
         is32bit = self.is32bit(path=path)
+        #is32bit = not self.is64bit()
 
         if not dll:
             if is32bit:
@@ -292,6 +303,17 @@ class Process(object):
         if maximize:
             argv += ["--maximize"]
 
+        # Start the target program using guest account
+        guest_user = "n00b"
+        guest_pass = "Pa$$w0rd"
+        argv += [ "--as-user", guest_user ]
+        argv += [ "--as-password", guest_pass]
+
+        # Change the permission of the sample file so the guest user can execute
+        if guest_user:
+            log.info("Changing file permission to run as user '%s'", guest_user)
+            os.system("c:\windows\\system32\\icacls.exe %s /grant \"%s:F\"" % (path, guest_user))
+            
         try:
             log.info("[DEBUG] HERE: %r", argv)
             output = subprocess_checkoutput(argv, env)
@@ -502,6 +524,8 @@ class Process(object):
             "mode": mode or "",
             "disguise": self.config.options.get("disguise", "0"),
             "pipe-pid": "1",
+            "sample-pid": self.pid,
+            "sample-tid": self.tid,
         }
 
         for key, value in lines.items():

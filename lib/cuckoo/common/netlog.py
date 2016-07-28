@@ -105,7 +105,6 @@ class BsonParser(ProtocolHandler):
             )
 
     def resolve_flags(self, apiname, argdict, flags):
-        log.info('[DEBUG] API name: %s', apiname)
         # Resolve 1:1 values.
         for argument, values in self.flags_value[apiname].items():
             if isinstance(argdict[argument], (str, unicode)):
@@ -130,17 +129,20 @@ class BsonParser(ProtocolHandler):
 
             for key, flag in values:
                 # TODO Have the monitor provide actual bitmasks as well.
-                if (value & key) == value:
-                    flags[argument].append(flag)
+                # For some reason, the flags could be signed
+                # Convert it to unsigned
+                if key < 0:
+                    key &= 0xffffffff
+
                 if isinstance(value, (str, unicode)):
                     if is_hex(value):
-                        if (int(value,16) & key) == value:
+                        if (int(value,16) & key) == key:
                             flags[argument].append(flag)
                     else:
-                        if (int(value) & key) == value:
+                        if (int(value) & key) == key:
                             flags[argument].append(flag)
                 else:
-                    if (value & key) == value:
+                    if (value & key) == key:
                         flags[argument].append(flag)
             flags[argument] = "|".join(flags[argument])
 
@@ -268,7 +270,7 @@ class BsonParser(ProtocolHandler):
 
                 apiname, arginfo, argnames, converters, category = self.infomap[index]
                 args = dec.get("args", [])
-
+                #log.info('[DEBUG] API name: %s, %r', apiname, args)
                 if len(args) != len(argnames):
                     log.warning(
                         "Inconsistent arg count (compared to arg names) "
@@ -278,7 +280,6 @@ class BsonParser(ProtocolHandler):
 
                 argdict = {}
                 for idx, value in enumerate(args):
-                    log.info("[DEBUG] Index: %s, value: %s", idx, value)
                     argdict[argnames[idx]] = converters[idx](value)
 
                 # Special new process message from the monitor.

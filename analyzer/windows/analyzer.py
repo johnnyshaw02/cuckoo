@@ -719,7 +719,7 @@ class Analyzer(object):
                 # If the process monitor is enabled we start checking whether
                 # the monitored processes are still alive.
                 if pid_check:
-                    if self.kernel_analysis != "yes":
+                    if not self.kernel_analysis:
                         for pid in self.process_list.pids:
                             if not Process(pid=pid).is_alive():
                                 log.info("Process with pid %s has terminated", pid)
@@ -795,7 +795,7 @@ class Analyzer(object):
             # Try to terminate remaining active processes.
             log.info("Terminating remaining processes before shutdown.")
 
-            if self.kernel_analysis != "yes":
+            if not self.kernel_analysis:
                 for pid in self.process_list.pids:
                     proc = Process(pid=pid)
                     if proc.is_alive():
