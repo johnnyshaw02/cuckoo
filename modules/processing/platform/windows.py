@@ -254,6 +254,10 @@ class WindowsMonitor(BehaviorHandler):
                 self.behavior[process["pid"]] = BehaviorReconstructor()
                 self.reboot[process["pid"]] = RebootReconstructor()
 
+            elif event["type"]  == "exploit":
+                """ Some processing here """
+                log.info("[DEBUG] Got exploit event, exploit type: %s", event["exploit_type"])
+
             # Create generic events out of the windows calls.
             elif event["type"] == "apicall":
                 behavior = self.behavior[event["pid"]]

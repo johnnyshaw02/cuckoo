@@ -343,6 +343,16 @@ class BsonParser(ProtocolHandler):
                     # self.handler.log_anomaly(subcategory, tid, msg)
                     # return True
 
+                elif apiname == "__exploit__":
+                    parsed["type"] = "exploit"
+                    parsed["pid"] = pid = argdict["pid"]
+                    parsed["ppid"] = ppid = argdict["ppid"]
+                    parsed["parent_process"] = parent_process = argdict["parent_process"]
+                    parsed["exploit_process"] = exploit_process = argdict["exploit_process"]
+                    parsed["exploit_type"] = exploit_type = argdict["exploit_type"]
+                    parsed["reason"] = argdict["reason"]
+                    parsed["category"] = category
+
                 else:
                     parsed["type"] = "apicall"
                     parsed["pid"] = self.pid

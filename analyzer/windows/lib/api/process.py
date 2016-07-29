@@ -304,15 +304,17 @@ class Process(object):
             argv += ["--maximize"]
 
         # Start the target program using guest account
-        guest_user = "n00b"
-        guest_pass = "Pa$$w0rd"
-        argv += [ "--as-user", guest_user ]
-        argv += [ "--as-password", guest_pass]
+        log.info("%r", self.config.options)
+        if "guest" in self.config.options:
+            guest_user = "n00b"
+            guest_pass = "Pa$$w0rd"
+            argv += [ "--as-user", guest_user ]
+            argv += [ "--as-password", guest_pass]
 
-        # Change the permission of the sample file so the guest user can execute
-        if guest_user:
-            log.info("Changing file permission to run as user '%s'", guest_user)
-            os.system("c:\windows\\system32\\icacls.exe %s /grant \"%s:F\"" % (path, guest_user))
+            # Change the permission of the sample file so the guest user can execute
+            if guest_user:
+                log.info("Changing file permission to run as user '%s'", guest_user)
+                os.system("c:\windows\\system32\\icacls.exe %s /grant \"%s:F\"" % (path, guest_user))
             
         try:
             log.info("[DEBUG] HERE: %r", argv)

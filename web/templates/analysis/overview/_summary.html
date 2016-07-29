@@ -7,6 +7,7 @@
             <li><a href="#summary_mutexes" data-toggle="tab">Mutexes</a></li>
             <li><a href="#summary_directories" data-toggle="tab">Directories</a></li>
             <li><a href="#summary_processes" data-toggle="tab">Processes</a></li>
+            <li><a href="#summary_exploit" data-toggle="tab">Exploit</a></li>
         </ul>
         <div class="tab-content">
             <div class="tab-pane fade in active" id="summary_files">
@@ -183,6 +184,29 @@
                                 {% for entry in process.summary.dll_loaded %}
                                     <li>{{entry}}</li>
                                 {% endfor %}
+                                </ul>
+                            </li>
+                        {% endif %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <div class="tab-pane fade" id="summary_exploit">
+                {% for process in analysis.behavior.generic %}
+                    {% if process.exploit %}
+                    <div class="panel panel-default">
+                        <div class="panel-heading"><h3 class="panel-title">Process {{process.process_name}} ({{process.pid}})</h3></div>
+                        <ul class="list-group">
+                        {% if process.exploit.exploit_type == 'KMExploitProt' %}
+                            <li class="list-group-item">
+                                <p><b>Elevation of Privilege Exploit</b></p>
+                                <ul>
+                                    <li>
+                                        <p>Application name: {{process.exploit.exploit_process}}({{process.exploit.pid}})</p>
+                                        <p>Parent process: {{process.exploit.parent_process}}({{process.exploit.ppid}})</p>
+                                        <p>Reason: {{process.exploit.reason}}</p>
+                                    </li>
                                 </ul>
                             </li>
                         {% endif %}
