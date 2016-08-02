@@ -155,7 +155,7 @@ class GenericBehavior(BehaviorHandler):
             self.processes[pid][category] = event
 
         else:
-            log.warning("Exploit event for unknown process id %u", event["pid"])
+            log.warning("Exploit event for unknown process id %u", pid)
 
 
     def run(self):

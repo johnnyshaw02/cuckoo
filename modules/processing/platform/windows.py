@@ -256,7 +256,7 @@ class WindowsMonitor(BehaviorHandler):
 
             elif event["type"]  == "exploit":
                 """ Some processing here """
-                log.info("[DEBUG] Got exploit event, exploit type: %s", event["exploit_type"])
+                log.info("Got exploit event, exploit type: %s", event["exploit_type"])
 
             # Create generic events out of the windows calls.
             elif event["type"] == "apicall":

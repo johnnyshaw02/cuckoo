@@ -64,7 +64,6 @@ class PipeForwarder(threading.Thread):
         sock = self.sockets[pid.value]
         self.active[pid.value] = True
 
-        log.info("[DEBUG] Socket: %s, Destination: %s", str(sock), self.destination)
         while True:
             success = KERNEL32.ReadFile(self.pipe_handle,
                                         byref(buf), sizeof(buf),

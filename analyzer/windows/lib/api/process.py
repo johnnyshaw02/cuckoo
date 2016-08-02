@@ -316,51 +316,23 @@ class Process(object):
                 log.info("Changing file permission to run as user '%s'", guest_user)
                 os.system("c:\windows\\system32\\icacls.exe %s /grant \"%s:F\"" % (path, guest_user))
             
-        try:
-            log.info("[DEBUG] HERE: %r", argv)
-            output = subprocess_checkoutput(argv, env)
-            self.pid, self.tid = map(int, output.split())
-        except Exception:
-            log.error("Failed to execute process from path %r with "
-                      "arguments %r (Error: %s)", path, argv,
-                      get_error_string(KERNEL32.GetLastError()))
-            return False
-
-        argv = [
-            inject_exe,
-            "--resume-thread",
-            "--pid", "%s" % self.pid,
-            "--tid", "%s" % self.tid,
-        ]
-
-        if free or kernel_analysis:
-            argv += ["--free"]
-        else:
-            argv += ["--apc", "--dll", dllpath]
-
-        argv += ["--config", self.drop_config(mode=mode)]
-
+        # Start the driver immediately before we execute the sample
+        # Even though in suspended mode, we might miss some events
         if kernel_analysis:
-            argv += ["--kernel_analysis"]
-            log.warning("kernel analysis !")
-
-            cuckoo_path = os.getcwd()
-            argv += ["--cuckoo_path", unicode(cuckoo_path)]
-
+            log.warning("kernel analysis!")
             sys_file = os.path.join("bin", driver_path)
             exe_file = os.path.join("bin", "logs_dispatcher.exe")
             if not sys_file or not exe_file or not os.path.exists(sys_file) or not os.path.exists(exe_file):
                 log.warning("No valid zer0m0n files to be used, analysis aborted")
                 return False
 
-            # We will install the KM analysis driver manually and
-            # start logs_dispatcher.exe manually
-            '''
+            # Automate the driver installation process
+            # Driver files and logs client must be ready in cuckoo "data/monitor/latest/" path
             exe_name = random_string(6)
             service_name = random_string(6)
             driver_name = random_string(6)
 
-            inf_data = '[Version]\r\nSignature = "$Windows NT$"\r\nClass = "ActivityMonitor"\r\nClassGuid = {b86dff51-a31e-4bac-b3cf-e8cfe75c9fc2}\r\nProvider= %Prov%\r\nDriverVer = 22/01/2014,1.0.0.0\r\nCatalogFile = %DriverName%.cat\r\n[DestinationDirs]\r\nDefaultDestDir = 12\r\nMiniFilter.DriverFiles = 12\r\n[DefaultInstall]\r\nOptionDesc = %ServiceDescription%\r\nCopyFiles = MiniFilter.DriverFiles\r\n[DefaultInstall.Services]\r\nAddService = %ServiceName%,,MiniFilter.Service\r\n[DefaultUninstall]\r\nDelFiles = MiniFilter.DriverFiles\r\n[DefaultUninstall.Services]\r\nDelService = %ServiceName%,0x200\r\n[MiniFilter.Service]\r\nDisplayName= %ServiceName%\r\nDescription= %ServiceDescription%\r\nServiceBinary= %12%\\%DriverName%.sys\r\nDependencies = "FltMgr"\r\nServiceType = 2\r\nStartType = 3\r\nErrorControl = 1\r\nLoadOrderGroup = "FSFilter Activity Monitor"\r\nAddReg = MiniFilter.AddRegistry\r\n[MiniFilter.AddRegistry]\r\nHKR,,"DebugFlags",0x00010001 ,0x0\r\nHKR,"Instances","DefaultInstance",0x00000000,%DefaultInstance%\r\nHKR,"Instances\\"%Instance1.Name%,"Altitude",0x00000000,%Instance1.Altitude%\r\nHKR,"Instances\\"%Instance1.Name%,"Flags",0x00010001,%Instance1.Flags%\r\n[MiniFilter.DriverFiles]\r\n%DriverName%.sys\r\n[SourceDisksFiles]\r\n' + driver_name + '.sys = 1,,\r\n[SourceDisksNames]\r\n1 = %DiskId1%,,,\r\n[Strings]\r\n' + 'Prov = "' + random_string(
+            inf_data = '[Version]\r\nSignature = "$Windows NT$"\r\nClass = "ActivityMonitor"\r\nClassGuid = {b86dff51-a31e-4bac-b3cf-e8cfe75c9fc2}\r\nProvider= %Prov%\r\nCatalogFile = %DriverName%.cat\r\n[DestinationDirs]\r\nDefaultDestDir = 12\r\nMiniFilter.DriverFiles = 12\r\n[DefaultInstall]\r\nOptionDesc = %ServiceDescription%\r\nCopyFiles = MiniFilter.DriverFiles\r\n[DefaultInstall.Services]\r\nAddService = %ServiceName%,,MiniFilter.Service\r\n[DefaultUninstall]\r\nDelFiles = MiniFilter.DriverFiles\r\n[DefaultUninstall.Services]\r\nDelService = %ServiceName%,0x200\r\n[MiniFilter.Service]\r\nDisplayName= %ServiceName%\r\nDescription= %ServiceDescription%\r\nServiceBinary= %12%\\%DriverName%.sys\r\nDependencies = "FltMgr"\r\nServiceType = 2\r\nStartType = 3\r\nErrorControl = 1\r\nLoadOrderGroup = "FSFilter Activity Monitor"\r\nAddReg = MiniFilter.AddRegistry\r\n[MiniFilter.AddRegistry]\r\nHKR,,"DebugFlags",0x00010001 ,0x0\r\nHKR,"Instances","DefaultInstance",0x00000000,%DefaultInstance%\r\nHKR,"Instances\\"%Instance1.Name%,"Altitude",0x00000000,%Instance1.Altitude%\r\nHKR,"Instances\\"%Instance1.Name%,"Flags",0x00010001,%Instance1.Flags%\r\n[MiniFilter.DriverFiles]\r\n%DriverName%.sys\r\n[SourceDisksFiles]\r\n' + driver_name + '.sys = 1,,\r\n[SourceDisksNames]\r\n1 = %DiskId1%,,,\r\n[Strings]\r\n' + 'Prov = "' + random_string(
                 8) + '"\r\nServiceDescription = "' + random_string(
                 12) + '"\r\nServiceName = "' + service_name + '"\r\nDriverName = "' + driver_name + '"\r\nDiskId1 = "' + service_name + ' Device Installation Disk"\r\nDefaultInstance = "' + service_name + ' Instance"\r\nInstance1.Name = "' + service_name + ' Instance"\r\nInstance1.Altitude = "370050"\r\nInstance1.Flags = 0x0'
 
@@ -369,10 +341,10 @@ class Process(object):
             copy(sys_file, new_sys)
             new_exe = os.path.join("bin", "{0}.exe".format(exe_name))
             copy(exe_file, new_exe)
-            log.info("[-] Driver name : "+new_sys)
-            log.info("[-] Inf name : "+new_inf)
-            log.info("[-] Application name : "+new_exe)
-            log.info("[-] Service : "+service_name)
+            log.info("[+] Driver name : "+new_sys)
+            log.info("[+] Inf name : "+new_inf)
+            log.info("[+] Application name : "+new_exe)
+            log.info("[+] Service : "+service_name)
 
             fh = open(new_inf,"w")
             fh.write(inf_data)
@@ -404,7 +376,37 @@ class Process(object):
             if not ldp:
                 log.error("Failed starting " + exe_name + ".exe.")
                 return False
-            '''
+
+        try:
+            log.info("[DEBUG] HERE: %r", argv)
+            output = subprocess_checkoutput(argv, env)
+            self.pid, self.tid = map(int, output.split())
+        except Exception:
+            log.error("Failed to execute process from path %r with "
+                      "arguments %r (Error: %s)", path, argv,
+                      get_error_string(KERNEL32.GetLastError()))
+            return False
+
+        argv = [
+            inject_exe,
+            "--resume-thread",
+            "--pid", "%s" % self.pid,
+            "--tid", "%s" % self.tid,
+        ]
+
+        if free or kernel_analysis:
+            argv += ["--free"]
+        else:
+            argv += ["--apc", "--dll", dllpath]
+
+        # Needs the arguments before resuming the thread
+        # Note: It must be placed after --only-start argument
+        if kernel_analysis:
+            argv += ["--kernel_analysis"]
+            cuckoo_path = os.getcwd()
+            argv += ["--cuckoo_path", unicode(cuckoo_path)]
+
+        argv += ["--config", self.drop_config(mode=mode)]
 
         try:
             log.info("[DEBUG] THERE: %r", argv)

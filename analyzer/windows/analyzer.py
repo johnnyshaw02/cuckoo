@@ -292,19 +292,19 @@ class CommandPipeHandler(object):
     def _handle_kprocess(self, data):
         """Add process id to monitor."""
         # Parse the process identifier.
-        if not data or data.isdigit():
+        if not data or not data.isdigit():
             log.warning("Received KPROCESS command from zer0m0n with an "
                         "incorrect argument.")
             return
         
         process_id = int(data)
         thread_id = None
-        
+
+        log.warning("KPROCESS: Monitoring new process: %d", process_id)
+
         # We acquire the process lock in order to prevent the analyzer to
         # terminate the analysis while we are operating on the new process.
         self.analyzer.process_lock.acquire()
-        
-        log.warning("KPROCESS command from zer0m0n.")
 
         if process_id in (self.analyzer.pid, self.analyzer.ppid):
             if process_id not in self.ignore_list["pid"]:
@@ -326,6 +326,7 @@ class CommandPipeHandler(object):
             # We're done operating on the processes list, release the lock.
             self.analyzer.process_lock.release()
             return
+
 
         proc = Process(pid=process_id, tid=thread_id)
         filename = os.path.basename(proc.get_filepath())
@@ -719,11 +720,11 @@ class Analyzer(object):
                 # If the process monitor is enabled we start checking whether
                 # the monitored processes are still alive.
                 if pid_check:
-                    if not self.kernel_analysis:
-                        for pid in self.process_list.pids:
-                            if not Process(pid=pid).is_alive():
-                                log.info("Process with pid %s has terminated", pid)
-                                self.process_list.remove_pid(pid)
+                    #if not self.kernel_analysis:
+                    for pid in self.process_list.pids:
+                        if not Process(pid=pid).is_alive():
+                            log.info("Process with pid %s has terminated", pid)
+                            self.process_list.remove_pid(pid)
                     
                     # If none of the monitored processes are still alive, we
                     # can terminate the analysis.
@@ -795,14 +796,14 @@ class Analyzer(object):
             # Try to terminate remaining active processes.
             log.info("Terminating remaining processes before shutdown.")
 
-            if not self.kernel_analysis:
-                for pid in self.process_list.pids:
-                    proc = Process(pid=pid)
-                    if proc.is_alive():
-                        try:
-                            proc.terminate()
-                        except:
-                            continue
+            #if not self.kernel_analysis:
+            for pid in self.process_list.pids:
+                proc = Process(pid=pid)
+                if proc.is_alive():
+                    try:
+                        proc.terminate()
+                    except:
+                        continue
 
         # Run the finish callback of every available Auxiliary module.
         for aux in aux_avail:
