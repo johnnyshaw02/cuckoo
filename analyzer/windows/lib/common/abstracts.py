@@ -61,7 +61,9 @@ class Package(object):
             "HomeDrive": [
                 # os.path.join() doesn't work well if you give it just "C:"
                 # so manually append a backslash.
-                os.getenv("HomeDrive") + "\\",
+                # If the user running the script is not the currently logged-in user
+                # HOMEDRIVE won't work
+                os.getenv("SystemDrive") + "\\",
             ],
         }
 

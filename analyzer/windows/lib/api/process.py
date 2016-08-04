@@ -304,17 +304,27 @@ class Process(object):
             argv += ["--maximize"]
 
         # Start the target program using guest account
-        log.info("%r", self.config.options)
         if "guest" in self.config.options:
             guest_user = "n00b"
             guest_pass = "Pa$$w0rd"
             argv += [ "--as-user", guest_user ]
             argv += [ "--as-password", guest_pass]
+            target_file = None
+
+            if args:
+                for arg in args:
+                    # The args could contain the DLL sample path if the host program is rundll32.exe
+                    if ".dll" in arg:
+                        dll_path = arg.split(".dll")[0]
+                        dll_path += ".dll"
+                        target_file = dll_path
+            else:
+                target_file = path
 
             # Change the permission of the sample file so the guest user can execute
             if guest_user:
-                log.info("Changing file permission to run as user '%s'", guest_user)
-                os.system("c:\windows\\system32\\icacls.exe %s /grant \"%s:F\"" % (path, guest_user))
+                log.info("Changing file '%s' permission to run as user '%s'", target_file, guest_user)
+                os.system("c:\windows\\system32\\icacls.exe %s /grant \"%s:F\"" % (target_file, guest_user))
             
         # Start the driver immediately before we execute the sample
         # Even though in suspended mode, we might miss some events
