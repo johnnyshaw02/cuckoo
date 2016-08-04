@@ -416,7 +416,7 @@ class Process(object):
             cuckoo_path = os.getcwd()
             argv += ["--cuckoo_path", unicode(cuckoo_path)]
 
-        argv += ["--config", self.drop_config(mode=mode)]
+        argv += ["--config", self.drop_config(mode=mode, trigger=trigger)]
 
         try:
             log.info("[DEBUG] THERE: %r", argv)
@@ -538,6 +538,7 @@ class Process(object):
             "mode": mode or "",
             "disguise": self.config.options.get("disguise", "0"),
             "pipe-pid": "1",
+            "trigger": trigger or "",
             "sample-pid": self.pid,
             "sample-tid": self.tid,
         }
