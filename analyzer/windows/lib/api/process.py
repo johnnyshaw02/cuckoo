@@ -165,15 +165,10 @@ class Process(object):
         @param args: list of arguments
         @return: the command-line equivalent
         """
-        # Subprocess features a more complete and accurate conversion method
-        # already, so use that if available (should be in all cases).
-        if hasattr(subprocess, "list2cmdline"):
-            return subprocess.list2cmdline(args)
-
         ret = []
         for line in args:
-            if " " in line or '"' in line:
-                ret.append("\"%s\"" % line.replace('"', '\\"'))
+            if " " in line:
+                ret.append('"%s"' % line)
             else:
                 ret.append(line)
         return " ".join(ret)
@@ -216,7 +211,8 @@ class Process(object):
         return bitsize == 32
 
     def execute(self, path, args=None, dll=None, free=False, curdir=None,
-                source=None, mode=None, maximize=False, env=None):
+                source=None, mode=None, maximize=False, env=None,
+                trigger=None):
         """Execute sample process.
         @param path: sample path.
         @param args: process args.
@@ -228,6 +224,7 @@ class Process(object):
         @param mode: monitor mode - which functions to instrument.
         @param maximize: whether the GUI should be maximized.
         @param env: environment variables.
+        @param trigger: trigger to indicate analysis start
         @return: operation status.
         """
         if not os.access(path, os.X_OK):
@@ -311,7 +308,7 @@ class Process(object):
             argv += [
                 "--apc",
                 "--dll", dllpath,
-                "--config", self.drop_config(mode=mode),
+                "--config", self.drop_config(mode=mode, trigger=trigger),
             ]
 
         try:
@@ -410,7 +407,7 @@ class Process(object):
 
         return True
 
-    def drop_config(self, track=True, mode=None):
+    def drop_config(self, track=True, mode=None, trigger=None):
         """Helper function to drop the configuration for a new process."""
         fd, config_path = tempfile.mkstemp()
 
@@ -433,6 +430,7 @@ class Process(object):
             "mode": mode or "",
             "disguise": self.config.options.get("disguise", "0"),
             "pipe-pid": "1",
+            "trigger": trigger or "",
         }
 
         for key, value in lines.items():

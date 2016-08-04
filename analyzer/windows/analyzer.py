@@ -616,15 +616,20 @@ class Analyzer(object):
         try:
             pids = self.package.start(self.target)
         except NotImplementedError:
-            raise CuckooError("The package \"{0}\" doesn't contain a run "
-                              "function.".format(package_name))
+            raise CuckooError(
+                "The package \"%s\" doesn't contain a run function." %
+                package_name
+            )
         except CuckooPackageError as e:
-            raise CuckooError("The package \"{0}\" start function raised an "
-                              "error: {1}".format(package_name, e))
+            raise CuckooError(
+                "The package \"%s\" start function raised an error: %s" %
+                (package_name, e)
+            )
         except Exception as e:
-            raise CuckooError("The package \"{0}\" start function encountered "
-                              "an unhandled exception: "
-                              "{1}".format(package_name, e))
+            raise CuckooError(
+                "The package \"%s\" start function encountered an unhandled "
+                "exception: %s" % (package_name, e)
+            )
 
         # If the analysis package returned a list of process identifiers, we
         # add them to the list of monitored processes and enable the process monitor.
@@ -786,7 +791,7 @@ if __name__ == "__main__":
     except Exception as e:
         # Store the error.
         error_exc = traceback.format_exc()
-        error = str(e)
+        error = "%s\n%s" % (e, error_exc)
 
         # Just to be paranoid.
         if len(log.handlers):
