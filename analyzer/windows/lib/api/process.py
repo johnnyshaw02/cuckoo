@@ -537,7 +537,9 @@ class Process(object):
             "pipe-pid": "1",
             "trigger": trigger or "",
             "sample-pid": self.pid,
-            "sample-tid": self.tid,        }
+            "sample-tid": self.tid,        
+        }
+
 
         for key, value in lines.items():
             os.write(fd, "%s=%s\n" % (key, value))
