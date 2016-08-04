@@ -32,6 +32,13 @@ log = logging.getLogger(__name__)
 # 20 Mb max message length.
 MAX_MESSAGE_LENGTH = 20 * 1024 * 1024
 
+def is_hex(s):
+    try:
+        int(s,16)
+        return True
+    except ValueError:
+        return False
+
 def pointer_converter_32bit(v):
     return "0x%08x" % (v % 2**32)
 
@@ -100,7 +107,7 @@ class BsonParser(ProtocolHandler):
     def resolve_flags(self, apiname, argdict, flags):
         # Resolve 1:1 values.
         for argument, values in self.flags_value[apiname].items():
-            if isinstance(argdict[argument], str):
+            if isinstance(argdict[argument], (str, unicode)):
                 value = int(argdict[argument], 16)
             else:
                 value = argdict[argument]
@@ -115,16 +122,28 @@ class BsonParser(ProtocolHandler):
 
             flags[argument] = []
 
-            if isinstance(argdict[argument], str):
+            if isinstance(argdict[argument], (str, unicode)):
                 value = int(argdict[argument], 16)
             else:
                 value = argdict[argument]
 
             for key, flag in values:
                 # TODO Have the monitor provide actual bitmasks as well.
-                if (value & key) == key:
-                    flags[argument].append(flag)
+                # For some reason, the flags could be signed
+                # Convert it to unsigned
+                if key < 0:
+                    key &= 0xffffffff
 
+                if isinstance(value, (str, unicode)):
+                    if is_hex(value):
+                        if (int(value,16) & key) == key:
+                            flags[argument].append(flag)
+                    else:
+                        if (int(value) & key) == key:
+                            flags[argument].append(flag)
+                else:
+                    if (value & key) == key:
+                        flags[argument].append(flag)
             flags[argument] = "|".join(flags[argument])
 
     def determine_unserializers(self, arginfo):
@@ -251,7 +270,7 @@ class BsonParser(ProtocolHandler):
 
                 apiname, arginfo, argnames, converters, category = self.infomap[index]
                 args = dec.get("args", [])
-
+                #log.info('[DEBUG] API name: %s, %r', apiname, args)
                 if len(args) != len(argnames):
                     log.warning(
                         "Inconsistent arg count (compared to arg names) "
@@ -323,6 +342,16 @@ class BsonParser(ProtocolHandler):
                     # msg = argdict["Message"]
                     # self.handler.log_anomaly(subcategory, tid, msg)
                     # return True
+
+                elif apiname == "__exploit__":
+                    parsed["type"] = "exploit"
+                    parsed["pid"] = pid = argdict["pid"]
+                    parsed["ppid"] = ppid = argdict["ppid"]
+                    parsed["parent_process"] = parent_process = argdict["parent_process"]
+                    parsed["exploit_process"] = exploit_process = argdict["exploit_process"]
+                    parsed["exploit_type"] = exploit_type = argdict["exploit_type"]
+                    parsed["reason"] = argdict["reason"]
+                    parsed["category"] = category
 
                 else:
                     parsed["type"] = "apicall"

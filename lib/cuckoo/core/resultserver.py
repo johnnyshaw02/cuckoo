@@ -136,6 +136,7 @@ class ResultHandler(SocketServer.BaseRequestHandler):
     def setup(self):
         self.rawlogfd = None
         self.protocol = None
+        self.processes = list()
         self.startbuf = ""
         self.end_request = threading.Event()
         self.done_event = threading.Event()
@@ -276,7 +277,7 @@ class ResultHandler(SocketServer.BaseRequestHandler):
         ppid = event["ppid"]
         procname = event["process_name"]
 
-        if self.rawlogfd:
+        if self.rawlogfd and isinstance(pid, (int, long)) and pid in self.processes:
             log.debug(
                 "ResultServer got a new process message but already "
                 "has pid %d ppid %s procname %s.", pid, ppid, procname
@@ -297,10 +298,14 @@ class ResultHandler(SocketServer.BaseRequestHandler):
                 "New process (pid=%s, ppid=%s, name=%s)",
                 pid, ppid, procname
             )
+            self.processes.append(pid)
 
-        filepath = os.path.join(self.storagepath, "logs", "%s.bson" % pid)
-        self.rawlogfd = open(filepath, "wb")
-        self.rawlogfd.write(self.startbuf)
+        # For KM analysis, it could have multiple __process__ events
+        # However, we only create file descriptor once
+        if not self.rawlogfd:
+            filepath = os.path.join(self.storagepath, "logs", "%s.bson" % pid)
+            self.rawlogfd = open(filepath, "wb")
+            self.rawlogfd.write(self.startbuf)
 
     def create_folders(self):
         folders = "shots", "files", "logs", "buffer"

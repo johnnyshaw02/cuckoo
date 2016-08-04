@@ -267,6 +267,7 @@ class Task(Base):
     target = Column(Text(), nullable=False)
     category = Column(String(255), nullable=False)
     timeout = Column(Integer(), server_default="0", nullable=False)
+    analysis = Column(Integer(), server_default="1", nullable=False)
     priority = Column(Integer(), server_default="1", nullable=False)
     custom = Column(String(255), nullable=True)
     owner = Column(String(64), nullable=True)
@@ -890,13 +891,14 @@ class Database(object):
     # The following functions are mostly used by external utils.
 
     @classlock
-    def add(self, obj, timeout=0, package="", options="", priority=1,
+    def add(self, obj, timeout=0, package="", options="", analysis=1, priority=1,
             custom="", owner="", machine="", platform="", tags=None,
             memory=False, enforce_timeout=False, clock=None, category=None):
         """Add a task to database.
         @param obj: object to add (File or URL).
         @param timeout: selected timeout.
         @param options: analysis options.
+        @param analysis: analysis mode.
         @param priority: analysis priority.
         @param custom: custom options.
         @param owner: task owner.
@@ -953,6 +955,7 @@ class Database(object):
         task.timeout = timeout
         task.package = package
         task.options = options
+        task.analysis = analysis
         task.priority = priority
         task.custom = custom
         task.owner = owner
@@ -991,13 +994,14 @@ class Database(object):
 
         return task_id
 
-    def add_path(self, file_path, timeout=0, package="", options="",
+    def add_path(self, file_path, timeout=0, package="", options="", analysis=1,
                  priority=1, custom="", owner="", machine="", platform="",
                  tags=None, memory=False, enforce_timeout=False, clock=None):
         """Add a task to database from file path.
         @param file_path: sample path.
         @param timeout: selected timeout.
         @param options: analysis options.
+        @param analysis: analysis mode.
         @param priority: analysis priority.
         @param custom: custom options.
         @param owner: task owner.
@@ -1019,17 +1023,18 @@ class Database(object):
         if not priority:
             priority = 1
 
-        return self.add(File(file_path), timeout, package, options, priority,
+        return self.add(File(file_path), timeout, package, options, analysis, priority,
                         custom, owner, machine, platform, tags, memory,
                         enforce_timeout, clock, "file")
 
-    def add_url(self, url, timeout=0, package="", options="", priority=1,
+    def add_url(self, url, timeout=0, package="", options="", analysis=1, priority=1,
                 custom="", owner="", machine="", platform="", tags=None,
                 memory=False, enforce_timeout=False, clock=None):
         """Add a task to database from url.
         @param url: url.
         @param timeout: selected timeout.
         @param options: analysis options.
+        @param analysis: analysis mode.
         @param priority: analysis priority.
         @param custom: custom options.
         @param owner: task owner.

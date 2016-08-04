@@ -59,6 +59,7 @@ def tasks_create_file():
     timeout = request.form.get("timeout", "")
     priority = request.form.get("priority", 1)
     options = request.form.get("options", "")
+    analysis = request.form.get("analysis", "")
     machine = request.form.get("machine", "")
     platform = request.form.get("platform", "")
     tags = request.form.get("tags", None)
@@ -82,6 +83,7 @@ def tasks_create_file():
         timeout=timeout,
         priority=priority,
         options=options,
+        analysis=analysis,
         machine=machine,
         platform=platform,
         tags=tags,
@@ -102,6 +104,7 @@ def tasks_create_url():
     timeout = request.form.get("timeout", "")
     priority = request.form.get("priority", 1)
     options = request.form.get("options", "")
+    analysis = request.form.get("analysis", "")
     machine = request.form.get("machine", "")
     platform = request.form.get("platform", "")
     tags = request.form.get("tags", None)
@@ -123,6 +126,7 @@ def tasks_create_url():
         package=package,
         timeout=timeout,
         options=options,
+        analysis=analysis,     
         priority=priority,
         machine=machine,
         platform=platform,

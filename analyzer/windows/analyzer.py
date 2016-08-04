@@ -289,6 +289,59 @@ class CommandPipeHandler(object):
 
         return self._inject_process(int(data), None, 0)
 
+    def _handle_kprocess(self, data):
+        """Add process id to monitor."""
+        # Parse the process identifier.
+        if not data or not data.isdigit():
+            log.warning("Received KPROCESS command from zer0m0n with an "
+                        "incorrect argument.")
+            return
+        
+        process_id = int(data)
+        thread_id = None
+
+        log.warning("KPROCESS: Monitoring new process: %d", process_id)
+
+        # We acquire the process lock in order to prevent the analyzer to
+        # terminate the analysis while we are operating on the new process.
+        self.analyzer.process_lock.acquire()
+
+        if process_id in (self.analyzer.pid, self.analyzer.ppid):
+            if process_id not in self.ignore_list["pid"]:
+                self.ignore_list["pid"].append(process_id)
+            self.analyzer.process_lock.release()
+            return
+
+        if self.analyzer.process_list.has_pid(process_id):
+            # this pid is already on the notrack list, move it to
+            # the list of tracked pids.
+            if not self.analyzer.process_list.has_pid(process_id, notrack=False):
+                self.analyzer.process_list.remove_pid(process_id)
+                self.analyzer.process_list.add_pid(process_id)
+                self.ignore_list["pid"].append(process_id)
+            # Spit out an error once and just ignore it further on.
+            elif process_id not in self.ignore_list["pid"]:
+                self.ignore_list["pid"].append(process_id)
+
+            # We're done operating on the processes list, release the lock.
+            self.analyzer.process_lock.release()
+            return
+
+
+        proc = Process(pid=process_id, tid=thread_id)
+        filename = os.path.basename(proc.get_filepath())
+        
+        if not self.analyzer.files.is_protected_filename(filename):
+            # Add the new process ID to the list of monitored processes.
+            self.analyzer.process_list.add_pids(process_id)
+
+        log.info("Process with pid %s and name %s added to the process list to monitor",    
+                proc.pid, filename)
+
+        self.analyzer.process_lock.release()
+        return
+               
+
     def _handle_process2(self, data):
         """Request for injection into a process using APC."""
         # Parse the process and thread identifier.
@@ -429,6 +482,7 @@ class Analyzer(object):
         self.files = Files()
         self.process_list = ProcessList()
         self.package = None
+        self.kernel_analysis = None
 
         self.reboot = []
 
@@ -454,6 +508,9 @@ class Analyzer(object):
 
         # Set the default DLL to be used for this analysis.
         self.default_dll = self.config.options.get("dll")
+
+        # Set analysis mode (userland or kernelland)
+        self.kernel_analysis = True if self.config.analysis == 2 else False
 
         # If a pipe name has not set, then generate a random one.
         if "pipe" in self.config.options:
@@ -668,11 +725,12 @@ class Analyzer(object):
                 # If the process monitor is enabled we start checking whether
                 # the monitored processes are still alive.
                 if pid_check:
+                    #if not self.kernel_analysis:
                     for pid in self.process_list.pids:
                         if not Process(pid=pid).is_alive():
                             log.info("Process with pid %s has terminated", pid)
                             self.process_list.remove_pid(pid)
-
+                    
                     # If none of the monitored processes are still alive, we
                     # can terminate the analysis.
                     if not self.process_list.pids:
@@ -743,6 +801,7 @@ class Analyzer(object):
             # Try to terminate remaining active processes.
             log.info("Terminating remaining processes before shutdown.")
 
+            #if not self.kernel_analysis:
             for pid in self.process_list.pids:
                 proc = Process(pid=pid)
                 if proc.is_alive():

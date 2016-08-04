@@ -94,7 +94,7 @@ class Machinery(object):
         self._initialize(module_name)
 
         # Run initialization checks.
-        self._initialize_check()
+        #self._initialize_check()
 
     def _get_resultserver_port(self):
         """Returns the ResultServer port."""

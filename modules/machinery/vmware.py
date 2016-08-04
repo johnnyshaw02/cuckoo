@@ -10,6 +10,7 @@ import subprocess
 import os.path
 import shutil
 import time
+import traceback
 
 from lib.cuckoo.common.abstracts import Machinery
 from lib.cuckoo.common.exceptions import CuckooMachineError
@@ -29,9 +30,10 @@ class VMware(Machinery):
                                      "please add it to vmware.conf")
 
         if not os.path.exists(self.options.vmware.path):
-            raise CuckooMachineError("VMware vmrun not found in "
-                                     "specified path %s" %
-                                     self.options.vmware.path)
+            traceback.print_stack()
+            #raise CuckooMachineError("VMware vmrun not found in "
+            #                         "specified path %s" %
+            #                         self.options.vmware.path)
         # Consistency checks.
         for machine in self.machines():
             vmx_path = machine.label
@@ -91,12 +93,13 @@ class VMware(Machinery):
         if self._is_running(vmx_path):
             raise CuckooMachineError("Machine %s is already running" %
                                      vmx_path)
-
-        self._revert(vmx_path, snapshot)
+        # We don't need to revert it for manual analysis
+        #self._revert(vmx_path, snapshot)
 
         time.sleep(3)
 
         log.debug("Starting vm %s" % vmx_path)
+        '''
         try:
             p = subprocess.Popen([self.options.vmware.path,
                                   "start", vmx_path,
@@ -112,7 +115,7 @@ class VMware(Machinery):
             mode = self.options.vmware.mode.upper()
             raise CuckooMachineError("Unable to start machine %s in %s "
                                      "mode: %s" % (vmx_path, mode, e))
-
+        '''
     def stop(self, vmx_path):
         """Stops a virtual machine.
         @param vmx_path: path to vmx file
@@ -158,6 +161,8 @@ class VMware(Machinery):
         @param vmx_path: path to vmx file
         @return: running status
         """
+        # Patched for manual analysis and always return False
+        return False
         try:
             p = subprocess.Popen([self.options.vmware.path, "list"],
                                  stdout=subprocess.PIPE,

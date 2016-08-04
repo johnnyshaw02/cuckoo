@@ -5,11 +5,14 @@
 
 import glob
 import os
+import logging
 
 from _winreg import CreateKey, SetValueEx, CloseKey, REG_DWORD, REG_SZ
 
 from lib.api.process import Process
 from lib.common.exceptions import CuckooPackageError
+
+log = logging.getLogger(__name__)
 
 class Package(object):
     """Base abstract analysis package."""
@@ -58,7 +61,9 @@ class Package(object):
             "HomeDrive": [
                 # os.path.join() doesn't work well if you give it just "C:"
                 # so manually append a backslash.
-                os.getenv("HomeDrive") + "\\",
+                # If the user running the script is not the currently logged-in user
+                # HOMEDRIVE won't work
+                os.getenv("SystemDrive") + "\\",
             ],
         }
 
@@ -141,6 +146,12 @@ class Package(object):
         """
         dll = self.options.get("dll")
         free = self.options.get("free")
+        kernel_analysis = self.analyzer.kernel_analysis
+
+        if kernel_analysis:
+            log.warning("Kernel analysis")
+        else:
+            log.warning("userland analysis")
 
         source = source or self.options.get("from")
         mode = mode or self.options.get("mode")
@@ -149,7 +160,7 @@ class Package(object):
         self.init_regkeys(self.REGKEYS)
 
         p = Process()
-        if not p.execute(path=path, args=args, dll=dll, free=free,
+        if not p.execute(path=path, args=args, dll=dll, free=free, kernel_analysis=kernel_analysis,
                          curdir=self.curdir, source=source, mode=mode,
                          maximize=maximize, env=env, trigger=trigger):
             raise CuckooPackageError(

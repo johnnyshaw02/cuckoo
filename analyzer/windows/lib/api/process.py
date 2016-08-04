@@ -8,16 +8,22 @@ import logging
 import random
 import subprocess
 import tempfile
+import _winreg
+import traceback
 
 from ctypes import byref, c_ulong, create_string_buffer, c_int, sizeof
 from ctypes import c_uint, c_wchar_p, create_unicode_buffer
+from shutil import copy
 
 from lib.common.constants import SHUTDOWN_MUTEX
 from lib.common.defines import KERNEL32, NTDLL, SYSTEM_INFO, STILL_ACTIVE
 from lib.common.defines import THREAD_ALL_ACCESS, PROCESS_ALL_ACCESS
+from lib.common.defines import STARTUPINFO, PROCESS_INFORMATION
+from lib.common.defines import CREATE_NEW_CONSOLE
 from lib.common.errors import get_error_string
 from lib.common.exceptions import CuckooError
 from lib.common.results import upload_to_host
+from lib.common.rand import random_string
 
 log = logging.getLogger(__name__)
 
@@ -210,7 +216,16 @@ class Process(object):
 
         return bitsize == 32
 
-    def execute(self, path, args=None, dll=None, free=False, curdir=None,
+    def is64bit(self):
+        aReg = _winreg.ConnectRegistry(None, _winreg.HKEY_LOCAL_MACHINE)
+        try:
+            hKey = _winreg.OpenKey(aReg, r'SOFTWARE\Wow6432Node')
+            hKey.Close()
+            return True
+        except:
+            return False
+
+    def execute(self, path, args=None, dll=None, free=False, kernel_analysis=False, curdir=None,
                 source=None, mode=None, maximize=False, env=None,
                 trigger=None):
         """Execute sample process.
@@ -218,6 +233,7 @@ class Process(object):
         @param args: process args.
         @param dll: dll path.
         @param free: do not inject our monitor.
+        @param kernel_analysis: performs analysis with zer0m0n driver
         @param curdir: current working directory.
         @param source: process identifier or process name which will
                        become the parent process for the new process.
@@ -231,8 +247,9 @@ class Process(object):
             log.error("Unable to access file at path \"%s\", "
                       "execution aborted", path)
             return False
-
+        
         is32bit = self.is32bit(path=path)
+        #is32bit = not self.is64bit()
 
         if not dll:
             if is32bit:
@@ -256,8 +273,10 @@ class Process(object):
             inject_is32bit = is32bit
 
         if inject_is32bit:
+            driver_path = "zer0m0n-x86.sys"
             inject_exe = os.path.join("bin", "inject-x86.exe")
         else:
+            driver_path = "zer0m0n-x64.sys"
             inject_exe = os.path.join("bin", "inject-x64.exe")
 
         argv = [
@@ -281,7 +300,92 @@ class Process(object):
         if maximize:
             argv += ["--maximize"]
 
+        # Start the target program using guest account
+        if "guest" in self.config.options:
+            guest_user = "n00b"
+            guest_pass = "Pa$$w0rd"
+            argv += [ "--as-user", guest_user ]
+            argv += [ "--as-password", guest_pass]
+            target_file = None
+
+            if args:
+                for arg in args:
+                    # The args could contain the DLL sample path if the host program is rundll32.exe
+                    if ".dll" in arg:
+                        dll_path = arg.split(".dll")[0]
+                        dll_path += ".dll"
+                        target_file = dll_path
+            else:
+                target_file = path
+
+            # Change the permission of the sample file so the guest user can execute
+            if guest_user:
+                log.info("Changing file '%s' permission to run as user '%s'", target_file, guest_user)
+                os.system("c:\windows\\system32\\icacls.exe %s /grant \"%s:F\"" % (target_file, guest_user))
+            
+        # Start the driver immediately before we execute the sample
+        # Even though in suspended mode, we might miss some events
+        if kernel_analysis:
+            log.warning("kernel analysis!")
+            sys_file = os.path.join("bin", driver_path)
+            exe_file = os.path.join("bin", "logs_dispatcher.exe")
+            if not sys_file or not exe_file or not os.path.exists(sys_file) or not os.path.exists(exe_file):
+                log.warning("No valid zer0m0n files to be used, analysis aborted")
+                return False
+
+            # Automate the driver installation process
+            # Driver files and logs client must be ready in cuckoo "data/monitor/latest/" path
+            exe_name = random_string(6)
+            service_name = random_string(6)
+            driver_name = random_string(6)
+
+            inf_data = '[Version]\r\nSignature = "$Windows NT$"\r\nClass = "ActivityMonitor"\r\nClassGuid = {b86dff51-a31e-4bac-b3cf-e8cfe75c9fc2}\r\nProvider= %Prov%\r\nCatalogFile = %DriverName%.cat\r\n[DestinationDirs]\r\nDefaultDestDir = 12\r\nMiniFilter.DriverFiles = 12\r\n[DefaultInstall]\r\nOptionDesc = %ServiceDescription%\r\nCopyFiles = MiniFilter.DriverFiles\r\n[DefaultInstall.Services]\r\nAddService = %ServiceName%,,MiniFilter.Service\r\n[DefaultUninstall]\r\nDelFiles = MiniFilter.DriverFiles\r\n[DefaultUninstall.Services]\r\nDelService = %ServiceName%,0x200\r\n[MiniFilter.Service]\r\nDisplayName= %ServiceName%\r\nDescription= %ServiceDescription%\r\nServiceBinary= %12%\\%DriverName%.sys\r\nDependencies = "FltMgr"\r\nServiceType = 2\r\nStartType = 3\r\nErrorControl = 1\r\nLoadOrderGroup = "FSFilter Activity Monitor"\r\nAddReg = MiniFilter.AddRegistry\r\n[MiniFilter.AddRegistry]\r\nHKR,,"DebugFlags",0x00010001 ,0x0\r\nHKR,"Instances","DefaultInstance",0x00000000,%DefaultInstance%\r\nHKR,"Instances\\"%Instance1.Name%,"Altitude",0x00000000,%Instance1.Altitude%\r\nHKR,"Instances\\"%Instance1.Name%,"Flags",0x00010001,%Instance1.Flags%\r\n[MiniFilter.DriverFiles]\r\n%DriverName%.sys\r\n[SourceDisksFiles]\r\n' + driver_name + '.sys = 1,,\r\n[SourceDisksNames]\r\n1 = %DiskId1%,,,\r\n[Strings]\r\n' + 'Prov = "' + random_string(
+                8) + '"\r\nServiceDescription = "' + random_string(
+                12) + '"\r\nServiceName = "' + service_name + '"\r\nDriverName = "' + driver_name + '"\r\nDiskId1 = "' + service_name + ' Device Installation Disk"\r\nDefaultInstance = "' + service_name + ' Instance"\r\nInstance1.Name = "' + service_name + ' Instance"\r\nInstance1.Altitude = "370050"\r\nInstance1.Flags = 0x0'
+
+            new_inf = os.path.join("bin", "{0}.inf".format(service_name))
+            new_sys = os.path.join("bin", "{0}.sys".format(driver_name))
+            copy(sys_file, new_sys)
+            new_exe = os.path.join("bin", "{0}.exe".format(exe_name))
+            copy(exe_file, new_exe)
+            log.info("[+] Driver name : "+new_sys)
+            log.info("[+] Inf name : "+new_inf)
+            log.info("[+] Application name : "+new_exe)
+            log.info("[+] Service : "+service_name)
+
+            fh = open(new_inf,"w")
+            fh.write(inf_data)
+            fh.close()
+
+            if not is32bit:
+                wow64 = c_ulong(0)
+                KERNEL32.Wow64DisableWow64FsRedirection(byref(wow64))
+
+            os.system('cmd /c "rundll32 setupapi.dll, InstallHinfSection DefaultInstall 132 ' + new_inf + '"')
+            os.system("net start " + service_name)
+
+            startup_info = STARTUPINFO()
+            startup_info._cb = sizeof(startup_info)
+            process_info = PROCESS_INFORMATION()
+            creation_flags = CREATE_NEW_CONSOLE
+            # Start log_dispatcher.exe
+            ldp = KERNEL32.CreateProcessA(new_exe,
+                                          None,
+                                          None,
+                                          None,
+                                          None,
+                                          creation_flags,
+                                          None,
+                                          os.getenv("TEMP"),
+                                          byref(startup_info),
+                                          byref(process_info))
+
+            if not ldp:
+                log.error("Failed starting " + exe_name + ".exe.")
+                return False
+
         try:
+            log.info("[DEBUG] HERE: %r", argv)
             output = subprocess_checkoutput(argv, env)
             self.pid, self.tid = map(int, output.split())
         except Exception:
@@ -290,11 +394,6 @@ class Process(object):
                       get_error_string(KERNEL32.GetLastError()))
             return False
 
-        if is32bit:
-            inject_exe = os.path.join("bin", "inject-x86.exe")
-        else:
-            inject_exe = os.path.join("bin", "inject-x64.exe")
-
         argv = [
             inject_exe,
             "--resume-thread",
@@ -302,16 +401,22 @@ class Process(object):
             "--tid", "%s" % self.tid,
         ]
 
-        if free:
-            argv.append("--free")
+        if free or kernel_analysis:
+            argv += ["--free"]
         else:
-            argv += [
-                "--apc",
-                "--dll", dllpath,
-                "--config", self.drop_config(mode=mode, trigger=trigger),
-            ]
+            argv += ["--apc", "--dll", dllpath]
+
+        # Needs the arguments before resuming the thread
+        # Note: It must be placed after --only-start argument
+        if kernel_analysis:
+            argv += ["--kernel_analysis"]
+            cuckoo_path = os.getcwd()
+            argv += ["--cuckoo_path", unicode(cuckoo_path)]
+
+        argv += ["--config", self.drop_config(mode=mode, trigger=trigger)]
 
         try:
+            log.info("[DEBUG] THERE: %r", argv)
             subprocess_checkoutput(argv, env)
         except Exception:
             log.error("Failed to execute process from path %r with "
@@ -431,6 +536,8 @@ class Process(object):
             "disguise": self.config.options.get("disguise", "0"),
             "pipe-pid": "1",
             "trigger": trigger or "",
+            "sample-pid": self.pid,
+            "sample-tid": self.tid,        
         }
 
         for key, value in lines.items():

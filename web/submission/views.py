@@ -92,6 +92,7 @@ def index(request, task_id=None, sha1=None):
     package = request.POST.get("package", "")
     timeout = force_int(request.POST.get("timeout"))
     options = request.POST.get("options", "")
+    analysis = force_int(request.POST.get("analysis"))
     priority = force_int(request.POST.get("priority"))
     machine = request.POST.get("machine", "")
     custom = request.POST.get("custom", "")
@@ -100,6 +101,9 @@ def index(request, task_id=None, sha1=None):
     tags = request.POST.get("tags", None)
 
     options = parse_options(options)
+
+    if analysis == 2:
+        options["analysis"] = "yes"
 
     # The following POST fields take precedence over the options field.
     if request.POST.get("route"):
@@ -136,6 +140,7 @@ def index(request, task_id=None, sha1=None):
                                   package=package,
                                   timeout=timeout,
                                   options=emit_options(options),
+                                  analysis=analysis,
                                   priority=priority,
                                   machine=entry,
                                   custom=custom,

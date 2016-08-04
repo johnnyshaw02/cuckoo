@@ -112,7 +112,7 @@ class GenericBehavior(BehaviorHandler):
     """Generates summary information."""
 
     key = "generic"
-    event_types = ["process", "generic"]
+    event_types = ["process", "generic", "exploit"]
 
     def __init__(self, *args, **kwargs):
         super(GenericBehavior, self).__init__(*args, **kwargs)
@@ -138,6 +138,25 @@ class GenericBehavior(BehaviorHandler):
             self.processes[pid]["summary"][category].add(event["value"])
         else:
             log.warning("Generic event for unknown process id %u", event["pid"])
+
+    def handle_exploit_event(self, event):
+        if isinstance(event["pid"], (str, unicode)):
+            pid = int(event["pid"], 10)
+        else:
+            pid = event["pid"]
+
+        if pid in self.processes:
+            if event["exploit_type"] in "KMExploitProt":
+                event["exploit_category"] = "EOPExploit"
+            else:
+                event["exploit_category"] = "OtherExploit"
+
+            category = event["type"]
+            self.processes[pid][category] = event
+
+        else:
+            log.warning("Exploit event for unknown process id %u", pid)
+
 
     def run(self):
         for process in self.processes.values():

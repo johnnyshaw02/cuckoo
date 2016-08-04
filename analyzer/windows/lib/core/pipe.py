@@ -82,7 +82,6 @@ class PipeForwarder(threading.Thread):
                 log.warning("The log pipe handler has failed, last error %d.",
                             KERNEL32.GetLastError())
                 break
-
         self.active[pid.value] = False
 
 class PipeDispatcher(threading.Thread):
