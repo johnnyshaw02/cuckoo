@@ -204,6 +204,7 @@ class ProcessMemory(Processing):
 
                 dump_path = os.path.join(self.pmemory_path, dmp)
                 dump_file = File(dump_path)
+                import re
 
                 pid, num = map(int, re.findall("(\\d+)", dmp))
 
@@ -213,6 +214,76 @@ class ProcessMemory(Processing):
                     urls=list(dump_file.get_urls()),
                     regions=list(self.read_dump(dump_path)),
                 )
+
+                if proc["yara"]:
+                    for match in proc["yara"]:
+                        # Locky
+                        if match["name"] == "Locky":
+                            import re
+                            pattern1 = re.compile('.{15}(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3},{0,1})+\x00')
+                            pattern2 = re.compile('.{15}(/.*\.(php|cgi))\x00')
+                            config_buf = ''
+                            pattern_num_match = ''
+
+                            f = open(dump_path, 'rb')
+                            while True:
+                                buf = f.read(24)
+                                if not buf:
+                                    break
+
+                                row = struct.unpack("QIIII", buf)
+                                addr, size, state, typ, protect = row
+
+                                protect = page_access.get(protect)
+                                if protect == 'rw':
+                                    content_buf = f.read(size)
+
+                                    # check config pattern 1
+                                    if pattern1.match(content_buf):
+                                        pattern_num_match = 1
+                                        config_buf = pattern1.match(content_buf).group()
+
+                                    # check config pattern 2
+                                    if pattern2.match(content_buf):
+                                        pattern_num_match = 2
+                                        config_buf = content_buf
+                                        break
+                                    continue
+
+                                f.seek(size, 1)
+                            f.close()
+
+                            # If config exist in memory
+                            if config_buf:
+                                c_attrib = config_buf[:15]
+
+                                row_attrib = struct.unpack('iIibbb', c_attrib)
+                                aff_id, dga_seed, delay_seconds, fake_svchost, persistence, ignore_russian = row_attrib
+                                config_dict = dict(AffliateID=aff_id,
+                                                   DGASeed=dga_seed,
+                                                   SecondsDelay=delay_seconds,
+                                                   FakeSvchostBool=fake_svchost,
+                                                   PersistenceBool=persistence,
+                                                   IgnoreRussianBool=ignore_russian)
+
+                                ip_pattern = re.compile('((\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3},{0,1})+)\x00')
+
+                                # for config pattern 1
+                                if pattern_num_match == 1:
+                                    ip_list = ip_pattern.match(config_buf, 15).group(1)
+
+                                # for config pattern 2
+                                elif pattern_num_match == 2:
+                                    url_path = pattern2.match(config_buf).group(1)
+                                    ip_list = ip_pattern.search(config_buf).group(1)
+                                    config_dict['urlPath'] = url_path
+
+                                ip_list = list(ip_list.split(','))
+                                ips = map(str, ip_list)
+                                config_dict['IPList'] = ips
+
+                                match["Locky_Config"] = config_dict
+                                # match["strings"].append(config_dict)
 
                 if self.options.get("idapro"):
                     self.create_idapy(proc)

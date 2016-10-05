@@ -12,6 +12,30 @@
             </div>
             <button type="submit" class="btn btn-primary">Search</button>
         </form>
+            <div id="help" class="collapse">
+                <p class="text-muted" style="margin-top: 10px">Test</p>
+                <table class="table table-striped table-centered" border="1">
+                    <thread>
+                        <tr>
+                            <th style="text-align: left;">Prefix</th>
+                            <th style="text-align: left;">Description</th>
+                        </tr>
+                    </thread>
+                    <tbody>
+                        {% for keyword in keywords %}
+                            {% for pref, desc in keyword.items %}
+                            <tr>
+                                <td align="left"><code>{{pref}}:</code></td>
+                                <td align="left">{{desc}}</td>
+                            </tr>
+                            {% endfor %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+
+
+            </div>
     </div>
 </div>
 <div id="results">
@@ -19,7 +43,7 @@
 </div>
 
 <script type="text/javascript">
-$("#form_search").on("input", function() {
+$("#form_search1").on("input", function() {
     $.post("{% url "analysis.views.search" %}", {
         raw: true,
         search: $("#form_search").val(),

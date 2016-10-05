@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 import _winreg
 import traceback
+import time
 
 from ctypes import byref, c_ulong, create_string_buffer, c_int, sizeof
 from ctypes import c_uint, c_wchar_p, create_unicode_buffer
@@ -243,6 +244,60 @@ class Process(object):
         @param trigger: trigger to indicate analysis start
         @return: operation status.
         """
+
+        # Run dummy FortTracer here
+        log.debug("Starting C:\\FortiTracer-5.0.582\FortiTracer.exe -p=C:\\Windows\System32\calc.exe --keep-alive")
+        startup_info = STARTUPINFO()
+        startup_info._cb = sizeof(startup_info)
+        process_info = PROCESS_INFORMATION()
+        creation_flags = 0x08000000
+        KERNEL32.CreateProcessA(None,
+                                "C:\\FortiTracer-5.0.582\FortiTracer.exe -p=C:\\Windows\System32\calc.exe --keep-alive",
+                                          None,
+                                          None,
+                                          None,
+                                          creation_flags,
+                                          None,
+                                          None,
+                                          byref(startup_info),
+                                          byref(process_info))
+
+        # Run VMDetector batch file
+        vm_detector_runmefirst = os.path.join("VMDetector20160829", "runmefirst.bat")
+        log.debug(vm_detector_runmefirst)
+        startup_info = STARTUPINFO()
+        startup_info._cb = sizeof(startup_info)
+        process_info = PROCESS_INFORMATION()
+        creation_flags = 0x08000000
+        KERNEL32.CreateProcessA(None,
+                                vm_detector_runmefirst,
+                                None,
+                                None,
+                                None,
+                                creation_flags,
+                                None,
+                                None,
+                                byref(startup_info),
+                                byref(process_info))
+
+        # Run VMDetector exe
+        vm_detector = os.path.join("VMDetector20160829", "VmDetector.exe")
+        log.debug(vm_detector)
+        startup_info = STARTUPINFO()
+        startup_info._cb = sizeof(startup_info)
+        process_info = PROCESS_INFORMATION()
+
+        KERNEL32.CreateProcessA(None,
+                                vm_detector,
+                                None,
+                                None,
+                                None,
+                                creation_flags,
+                                None,
+                                None,
+                                byref(startup_info),
+                                byref(process_info))
+
         if not os.access(path, os.X_OK):
             log.error("Unable to access file at path \"%s\", "
                       "execution aborted", path)
@@ -256,6 +311,7 @@ class Process(object):
                 dll = "monitor-x86.dll"
             else:
                 dll = "monitor-x64.dll"
+
 
         dllpath = os.path.abspath(os.path.join("bin", dll))
 
@@ -385,6 +441,9 @@ class Process(object):
                 return False
 
         try:
+            # Sleep 5 seconds to assure vmdetector.exe is fully executed
+            log.debug("Sleep 10 seconds before execute the sample. At least vmdetector.exe has been fully executed")
+            time.sleep(10)
             log.info("[DEBUG] HERE: %r", argv)
             output = subprocess_checkoutput(argv, env)
             self.pid, self.tid = map(int, output.split())

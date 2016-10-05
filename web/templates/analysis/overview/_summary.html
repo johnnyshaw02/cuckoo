@@ -8,6 +8,7 @@
             <li><a href="#summary_directories" data-toggle="tab">Directories</a></li>
             <li><a href="#summary_processes" data-toggle="tab">Processes</a></li>
             <li><a href="#summary_exploit" data-toggle="tab">Exploit</a></li>
+            <li><a href="#summary_lockyconfig" data-toggle="tab">Locky Config</a></li>
         </ul>
         <div class="tab-content">
             <div class="tab-pane fade in active" id="summary_files">
@@ -214,6 +215,29 @@
                     </div>
                     {% endif %}
                 {% endfor %}
+            </div>
+            <div class="tab-pane fade" id="summary_lockyconfig">
+                {% for proc in analysis.procmemory %}
+                    {% if proc.yara %}
+                        {% for match in proc.yara %}
+                            {% if match.Locky_Config %}
+                                <b>Locky Configuration</b></br>
+                                <ul>
+                                    {% for key, value in match.Locky_Config.items %}
+                                        {% if key == "IPList" %}
+                                            <li><b>{{key}}:</b>{{value|join:"," }}</li>
+                                        {% else %}
+                                            <li>{{key}}: {{value}}</li>
+                                        {% endif %}
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                {% endfor %}
+
+
+
             </div>
         </div>
     </div>

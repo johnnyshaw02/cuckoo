@@ -27,6 +27,20 @@
                             <li>{{string}}</li>
                         {% endfor %}
                         </ul></p>
+                        {% if match.Locky_Config %}
+                            <b>Locky Config</b></br>
+                            <ul>
+                            {% for key, value in match.Locky_Config.items %}
+                                {% if key == "IPList" %}
+                                    <li><b>{{key}}:</b>{{value|join:"," }}</li>
+                                {% else %}
+                                    <li><b>{{key}}:</b>{{value}}</li>
+                                {% endif %}
+                             {% endfor %}
+                            </ul>
+
+                        {% endif %}
+
                     {% endfor %}
                 {% endif %}
 

@@ -182,6 +182,38 @@ class ElasticSearch(Report):
             if len(bulk_index) > 0:
                 self.do_bulk_index(bulk_index)
 
+    def process_generic_exploit(self, generic_results):
+        """Get the exploit event for indexing if any
+           Take note that the exploit data can be found
+           in one of the processes generic behavior"""
+        exploit_index = []
+        for process in generic_results:
+            if "exploit" in process.keys():
+                exploit_index.append(process.get("exploit", {}))
+
+        return exploit_index
+
+    def procmem_yara(self, memory_results):
+        """Get the exploit event for indexing if any
+           Take note that the exploit data can be found
+           in one of the processes generic behavior"""
+        yara_index = []
+        # x = 1
+        for memory in memory_results:
+            if "yara" in memory.keys():
+                match_yara = memory.get("yara")
+                for yara in match_yara:
+                    yara_index.append(yara)
+                    # if x == 1:
+                    #    yara_index.append(yara)
+            # x += 1
+
+                #yara_index.append(memory.get("yara", {}))
+
+        return yara_index
+
+
+
     def run(self, results):
         """Index the Cuckoo report into ElasticSearch.
         @param results: analysis results dictionary.
@@ -200,7 +232,9 @@ class ElasticSearch(Report):
         self.do_index({
             "target": results.get("target"),
             "summary": results.get("behavior", {}).get("summary"),
+            "exploit": self.process_generic_exploit(results.get("behavior", {}).get("generic", [])),
             "virustotal": results.get("virustotal"),
+            "procmem_yara": self.procmem_yara(results.get("procmemory", {})),
         })
 
         # Index the API calls.

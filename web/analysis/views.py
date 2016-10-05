@@ -388,6 +388,7 @@ def _search_helper(obj, k, value):
 
     return r
 
+
 @csrf_exempt
 def search(request):
     """New Search API using ElasticSearch as backend."""
@@ -397,22 +398,57 @@ def search(request):
                      "not possible to do a global search.",
         })
 
+    """These are the keywords indexed in elasticsearch.py"""
+    SPECIAL_FIELDS = [
+                        {  "target": "Search over basic sample's information like file hash and type (Example: target: PE32)" },
+                        {  "summary": "Search over summary of the sample's behavior analysis (Example: summary: file_opened)" },
+                        {  "virustotal": "Search over detection name from virustotal result (Example: virustotal: Backdoor*)" },
+                        {  "exploit": "Search over the sample that contains exploit from behavior analysis result (Example: exploit: EOPExploit)" },
+                        {  "procmem_yara": "Search over the sample that contains exploit from behavior analysis result (Example: yara: yara)" },
+                    ]
+    # SPECIAL_FIELDS = [
+    #                     {  "target": "Search over basic sample's information like file hash and type" },
+    #                     {  "summary": "Search over summary of the sample's behavior analysis" },
+    #                     {  "virustotal": "Search over detection name from virustotal result" },
+    #                     {  "exploit": "Search over the sample that contains exploit from behavior analysis result" },
+    #                     {  "yara": "Search over the sample that contains exploit from behavior analysis result" },
+    #                 ]
+
     if request.method == "GET":
-        return render(request, "analysis/search.html")
+        return render(request, "analysis/search.html", {"keywords": SPECIAL_FIELDS})
 
     value = request.POST["search"]
+    match_field = re.search("(^[a-z-A-Z0-9]+)\s*:\s*(.*)", value)
+
+    """"Handle special keywords for ES fields here if any"""
+    if match_field is not None:
+        field, value = match_field.group(1, 2)
+        es_body = {
+                    "query": {
+                        "query_string": {
+                            "fields": [field + ".*" if field in [fields.keys()[0] for fields in SPECIAL_FIELDS] else "_all"],
+                            "query": '%s OR %s' % (value, value.lower()),
+                            "lenient": 'true',
+                            "lowercase_expanded_terms": 'false'
+                        },
+                    },
+                  }
+    else:
+        es_body = {
+                    "query": {
+                        "query_string": {
+                            "query": '%s' % value if len(value) is 0 else '%s OR %s' % (value, value.lower()),
+                            "lenient": 'true',
+                            "lowercase_expanded_terms": 'false'
+                        },
+                    },
+                  }
 
     match_value = ".*".join(re.split("[^a-zA-Z0-9]+", value.lower()))
 
     r = settings.ELASTIC.search(
         index=settings.ELASTIC_INDEX + "-*",
-        body={
-            "query": {
-                "query_string": {
-                    "query": '"%s"*' % value,
-                },
-            },
-        }
+        body=es_body
     )
 
     analyses = []
@@ -426,6 +462,8 @@ def search(request):
             "task_id": hit["_source"]["report_id"],
             "matches": matches[:16],
             "total": max(len(matches)-16, 0),
+            "md5": hit["_source"]["target"]["file"]["md5"],
+            "filename": hit["_source"]["target"]["file"]["name"],
         })
 
     if request.POST.get("raw"):
@@ -438,6 +476,7 @@ def search(request):
         "analyses": analyses,
         "term": request.POST["search"],
         "error": None,
+        "keywords": SPECIAL_FIELDS,
     })
 
 @require_safe
